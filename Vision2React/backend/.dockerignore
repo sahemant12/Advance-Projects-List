@@ -1,0 +1,61 @@
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Environment files with secrets
+.env
+.env.*
+*.env
+
+# Development and testing
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+.hypothesis/
+tests/
+test_*.py
+
+# Git metadata
+.git/
+.gitignore
+.gitattributes
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+README.md
+*.md
+docs/
+
+# Local data and logs
+data/
+*.log
+*.sqlite
+*.db
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# UV/uv cache
+.uv_cache/
+
+# Docker files themselves
+Dockerfile
+docker-compose.yml

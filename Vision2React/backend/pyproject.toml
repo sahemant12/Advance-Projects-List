@@ -1,0 +1,29 @@
+[project]
+name = "backend"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "boto3>=1.40.57",
+    "e2b>=2.5.0",
+    "e2b-code-interpreter>=2.2.1",
+    "fastapi>=0.120.3",
+    "httpx>=0.28.1",
+    "langchain-core>=1.0.1",
+    "langchain-google-genai>=3.0.0",
+    "langchain-groq>=1.0.0",
+    "langchain-openai>=1.0.1",
+    "langgraph>=1.0.1",
+    "prisma>=0.15.0",
+    "pydantic>=2.12.3",
+    "pydantic-settings>=2.11.0",
+    "python-dotenv>=1.1.1",
+    "redis>=6.4.0",
+    "requests>=2.32.5",
+    "toon-format",
+    "uvicorn>=0.38.0",
+]
+
+[tool.uv.sources]
+toon-format = { git = "https://github.com/toon-format/toon-python.git" }

@@ -1,0 +1,22 @@
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                Int     @id @default(autoincrement())
+  githubId          Int     @unique @map("github_id")
+  githubUsername    String  @unique @map("github_username")
+  githubAccessToken String  @map("github_access_token")
+  figmaToken        String? @map("figma_token")
+  email             String?
+  name              String?
+
+  @@map("users")
+}

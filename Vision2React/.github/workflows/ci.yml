@@ -1,0 +1,63 @@
+name: CI - Test and Build
+
+on:
+  push:
+    branches: ["*"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup UV
+        uses: astral-sh/setup-uv@v1
+        with:
+          version: "latest"
+
+      # Compiling all .py files without running them
+      - name: Check Python Syntax
+        run: |
+          cd backend
+          python -m py_compile main.py worker/main.py
+
+      # Check to ensure all dependencies are installed correctly
+      - name: Install dependencies
+        run: |
+          cd backend
+          uv sync --no-dev
+
+      # Check for any exposed API's or env's
+      - name: Security scan
+        uses: trufflesecurity/trufflehog@main
+
+  build:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: false
+          tags: test-image:${{ github.sha }}
+          load: true
+
+      - name: Test Docker image
+        run: |
+          docker run --rm test-image:${{ github.sha }} python -c "
+          import sys
+          print('Testing Docker image...')
+          import main
+          from worker import main as worker_main
+          print('Docker image is functional')
+          print(f'Python: {sys.version}')
+          "

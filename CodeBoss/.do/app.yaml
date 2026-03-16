@@ -1,0 +1,72 @@
+name: brainly-backend
+region: blr
+services:
+  - name: api
+    github:
+      repo: kr1shna-exe/CodeBoss
+      branch: main
+      deploy_on_push: true
+
+    # dockerfile_path: backend/Dockerfile
+    # source_dir: backend
+    # http_port: 8000
+
+    instance_count: 1
+    instance_size_slug: basic-xxs
+
+    image:
+      registry_type: GHCR
+      repository: kr1shna-exe/codeboss/backend
+      tag: main
+    # registry:
+    #   server: ghcr.io
+    #   username: kr1shna-exe
+    #   password: ${GITHUB_DO_TOKEN}
+
+    envs:
+      - key: GITHUB_WEBHOOK_SECRET
+        value: ${GITHUB_WEBHOOK_SECRET}
+        type: SECRET
+      - key: GITHUB_APP_ID
+        value: ${GITHUB_APP_ID}
+        type: SECRET
+      - key: GITHUB_APP_PRIVATE_KEY_PATH
+        value: ${GITHUB_APP_PRIVATE_KEY_PATH}
+        type: SECRET
+      - key: GITHUB_BOT_TOKEN
+        value: ${GITHUB_BOT_TOKEN}
+        type: SECRET
+      - key: GITHUB_TOKEN
+        value: ${GITHUB_TOKEN}
+        type: SECRET
+      - key: GITHUB_APP_SLUG
+        value: ${GITHUB_APP_SLUG}
+        type: SECRET
+      - key: QDRANT_DB
+        value: ${QDRANT_DB}
+        type: SECRET
+      - key: QDRANT_API_KEY
+        value: ${QDRANT_API_KEY}
+        type: SECRET
+      - key: AI_PROVIDER
+        value: ${AI_PROVIDER}
+        type: SECRET
+      - key: GROQ_API_KEY
+        value: ${GROQ_API_KEY}
+        type: SECRET
+      - key: GEMINI_API_KEY
+        value: ${GEMINI_API_KEY}
+        type: SECRET
+      - key: TEMP_REPO_DIR
+        value: "/tmp/repos"
+        type: GENERAL
+
+    routes:
+      - path: /
+
+    # autoscaling:
+    #   min_instance_count: 0
+    #   max_instance_count: 3
+    #   metrics:
+    #     cpu:
+    #       percent: 80

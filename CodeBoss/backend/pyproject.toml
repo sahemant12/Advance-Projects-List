@@ -1,0 +1,51 @@
+[project]
+name = "coderabbit-clone"
+version = "0.1.0"
+description = "AI-powered code review system"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn>=0.24.0",
+    "gitpython>=3.1.40",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "httpx>=0.25.0",
+    "python-dotenv>=1.0.0",
+    "pygithub>=2.1.1",
+    "tree-sitter>=0.20.4",
+    "tree-sitter-python>=0.20.4",
+    "pylint>=3.0.0",
+    "bandit>=1.7.5",
+    "google-generativeai>=0.3.0", # For Gemini
+    "redis>=5.0.0",
+    "pyjwt>=2.10.1",
+    "cryptography>=46.0.2",
+    "tree-sitter-javascript>=0.25.0",
+    "tree-sitter-typescript>=0.23.2",
+    "tree-sitter-go>=0.25.0",
+    "tree-sitter-rust>=0.24.0",
+    "networkx>=3.2.1",
+    "dotenv>=0.9.9",
+    # "sentence-transformers>=5.1.1",
+    # "torch>=2.8.0",
+    "qdrant-client>=1.15.1",
+    "langgraph>=0.2.60",
+    "langchain>=0.3.7",
+    "langchain-google-genai>=2.0.4",
+    "zai-sdk>=0.0.4",  # Z.AI API integration
+    "groq>=0.11.0",  # Groq API integration
+]
+
+[tool.uv]
+package = true
+
+[dependency-groups]
+dev = [
+    "pytest>=7.4.3",
+    "pytest-asyncio>=0.21.1",
+    "black>=23.11.0",
+    "ruff>=0.1.6",
+]
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,167 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+import asyncio
+from typing import Any
+
+from sqlmodel import Session
+
+from db.database import get_session
+from db.models.models import Execution, ExecutionStatus, Workflow
+from server.redis.index import addToQueue, getFromQueue
+from Workers.nodes.runNode.runner import runNode
+
+
+async def update_execution(
+    execution_id: str, node_id: str, node_result: Any, db: Session
+):
+    execution = db.get(Execution, execution_id)
+    if not execution:
+        return
+    cur_result = execution.result or {"nodeResults": {}}
+    new_tasks_done = (execution.tasks_done or 0) + 1
+    total_tasks = execution.total_tasks or 0
+    is_complete = new_tasks_done >= total_tasks
+    node_results = cur_result.get("nodeResults", {})
+    node_results[node_id] = {
+        "result": node_result,
+        "completedAt": asyncio.get_event_loop().time(),
+    }
+    new_result = {**cur_result, "nodeResults": node_results}
+    if is_complete:
+        new_result["completedAt"] = asyncio.get_event_loop().time()
+        execution.status = ExecutionStatus.COMPLETED
+    execution.tasks_done = new_tasks_done
+    execution.result = new_result
+    db.add(execution)
+    db.commit()
+    print(f"Execution completed: {execution_id}, {new_tasks_done}, {total_tasks}")
+
+
+async def process_jobs():
+    print("Worker started...")
+    while True:
+        try:
+            print("Waiting for a job...")
+            job = await getFromQueue(2)
+            if not job:
+                await asyncio.sleep(0.1)
+                continue
+            print("--- Received a job ---")
+            print("Job data:", job)
+
+            job_type = job.get("type")
+            node_result = {}
+            with next(get_session()) as db:
+                if job_type == "form":
+                    try:
+                        execution = db.get(Execution, job["data"]["executionId"])
+                        if execution:
+                            execution.status = ExecutionStatus.PAUSED
+                            execution.paused_node_id = job["data"]["nodeId"]
+                            db.add(execution)
+                            db.commit()
+                            print(
+                                f"Execution {execution.id} paused for form input at node {job['data']['nodeId']}."
+                            )
+                    finally:
+                        db.close()
+                    continue
+
+                if job_type == "webhook":
+                    node_result = job["data"].get("context", {})
+                elif job_type != "manual":
+                    # Try to get config from different possible paths
+                    node_data = job["data"]["nodeData"]
+                    config = (
+                        node_data.get("data", {}).get("config", {})
+                        if isinstance(node_data.get("data"), dict)
+                        else {}
+                    )
+
+                    node = {
+                        "type": job_type,
+                        "template": config.get("template", {}),
+                        "credentialId": config.get("credentialId", ""),
+                    }
+                    context = {
+                        **job["data"].get("context", {}),
+                        "executionId": job["data"]["executionId"],
+                    }
+                    print(f"Processing {job_type} node with config: {config}")
+                    print(f"Context keys: {list(context.keys())}")
+                    try:
+                        node_result = await runNode(node, context)
+                        print(f"{job_type} node completed with result: {node_result}")
+                    except Exception as node_error:
+                        print(f"ERROR processing {job_type} node: {node_error}")
+                        import traceback
+
+                        traceback.print_exc()
+                        # Mark execution as failed instead of leaving it hanging
+                        execution = db.get(Execution, job["data"]["executionId"])
+                        if execution:
+                            execution.status = ExecutionStatus.FAILED
+                            db.add(execution)
+                            db.commit()
+                        continue
+
+                if (
+                    isinstance(node_result, dict)
+                    and node_result.get("status") == ExecutionStatus.PAUSED
+                ):
+                    execution = db.get(Execution, job["data"]["executionId"])
+                    if execution:
+                        execution.status = ExecutionStatus.PAUSED
+                        execution.paused_node_id = job["data"]["nodeId"]
+                        db.add(execution)
+                        db.commit()
+                        print(
+                            f"Execution {execution.id} paused at node {job['data']['nodeId']}"
+                        )
+                        continue
+                await update_execution(
+                    job["data"]["executionId"],
+                    job["data"]["nodeId"],
+                    node_result,
+                    db,
+                )
+
+                workflow = db.get(Workflow, job["data"]["workflowId"])
+                if workflow and job["data"].get("connections"):
+                    nodes = workflow.nodes or {}
+                    connections = workflow.connections or {}
+                    updated_context = {
+                        **job["data"].get("context", {}),
+                        **(node_result or {}),
+                    }
+                    for next_node_id in job["data"]["connections"]:
+                        next_node_data = nodes.get(next_node_id)
+                        if not next_node_data:
+                            continue
+                        node_type = (
+                            next_node_data.get("data", {}).get("nodeType", "").lower()
+                            or next_node_data.get("type", "").lower()
+                        )
+                        next_job = {
+                            "id": f"{next_node_id}-{job['data']['executionId']}",
+                            "type": node_type,
+                            "data": {
+                                **job["data"],
+                                "nodeId": next_node_id,
+                                "nodeData": next_node_data,
+                                "credentialId": next_node_data.get("credentials"),
+                                "context": updated_context,
+                                "connections": connections.get(next_node_id, []),
+                            },
+                        }
+                        print(
+                            f"Adding {node_type} job to queue for node {next_node_id}"
+                        )
+                        await addToQueue(next_job)
+        except Exception as exe:
+            print(f"Error occured while processing the job: {exe}")
+
+
+asyncio.run(process_jobs())

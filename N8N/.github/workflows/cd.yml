@@ -1,0 +1,55 @@
+name: CD Pipeline - Azure VM
+
+on:
+  workflow_run:
+    workflows: ["CI Pipeline"]
+    types:
+      - completed
+    branches: [main]
+
+jobs:
+  deploy:
+    name: Deploy to Azure VM
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to Azure VM via SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USERNAME }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            # Login to GitHub Container Registry
+            echo ${{ secrets.GHCR_PAT }} | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+            # Pull the latest image
+            docker pull ghcr.io/${{ github.repository_owner }}/n8n-python-backend:latest
+
+            # Stoping and removing the old container if it already exists
+            docker stop n8n-backend || true
+            docker rm n8n-backend || true
+
+            # Remove all the old images to save disk space
+            docker image prune -f
+
+            # Running new container
+            docker run -d \
+              --name n8n-backend \
+              --restart unless-stopped \
+              -p 8000:8000 \
+              -e TAVILY_API_KEY="${{ secrets.TAVILY_API_KEY }}" \
+              -e REDIS_HOST="${{ secrets.REDIS_HOST }}" \
+              -e REDIS_PORT="${{ secrets.REDIS_PORT }}" \
+              -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+              -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+              -e BASE_URL="${{ secrets.BASE_URL }}" \
+              -e FRONTEND_URL="${{ secrets.FRONTEND_URL }}" \
+              ghcr.io/${{ github.repository_owner }}/n8n-python-backend:latest
+
+            # Show container status
+            docker ps | grep n8n-backend || echo "Warning: Container not running"
